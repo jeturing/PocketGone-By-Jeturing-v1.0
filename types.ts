@@ -17,7 +17,7 @@ export interface SignalLog {
   id: string;
   timestamp: number;
   frequency: number;
-  bandwidth: number; // Changed from 'type' to bandwidth to match previous usage, or keep consistent
+  bandwidth: number;
   peakDb: number;
   notes: string;
 }
@@ -30,10 +30,12 @@ export interface BluetoothDevice {
   cod: string; // Class of Device
   vendor: string;
   lastSeen: number;
-  isConnected?: boolean; // Connection status
+  isConnected?: boolean;
 }
 
 // WiFi Types
+export type WifiBand = '2.4GHz' | '5GHz' | '6GHz';
+
 export interface WifiNetwork {
   ssid: string;
   bssid: string;
@@ -41,6 +43,8 @@ export interface WifiNetwork {
   rssi: number;
   security: string;
   vendor: string;
+  band: WifiBand;
+  width?: number; // MHz (20, 40, 80)
 }
 
 // Modo S Status
@@ -51,12 +55,13 @@ export enum ModoSState {
 }
 
 // KPI Data Types
-export interface KpiData {
-  totalDevices: number;
-  avgRssi: number;
-  threatLevel: 'LOW' | 'MEDIUM' | 'HIGH';
-  activeTime: number; // seconds
-  vendorDistribution: { name: string; count: number }[];
+export interface KpiStats {
+  uptimeSeconds: number;
+  packetsCaptured: number;
+  threatsBlocked: number;
+  activeDevices: number;
+  storageUsagePercent: number;
+  cpuTemp: number;
 }
 
 // User Auth Types
@@ -69,11 +74,11 @@ export interface UserSession {
 
 // Navigation Tabs
 export enum AppTab {
-  DASHBOARD = 'DASHBOARD',
+  DASHBOARD = 'DASHBOARD', // KPI Dashboard
+  SPECTRUM = 'SPECTRUM',   // Previous Dashboard
   BLUETOOTH = 'BLUETOOTH',
   WIFI = 'WIFI',
   LOGS = 'LOGS',
   ANALYSIS = 'ANALYSIS',
-  SETTINGS = 'SETTINGS',
-  KPI = 'KPI'
+  SETTINGS = 'SETTINGS'
 }

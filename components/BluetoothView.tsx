@@ -217,7 +217,7 @@ export const BluetoothView: React.FC<BluetoothViewProps> = ({ onModoSToggle, mod
 
   // Window Timer Logic
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (modoSState !== ModoSState.IDLE) {
        interval = setInterval(() => {
           setWindowTimer(prev => prev + 1);
