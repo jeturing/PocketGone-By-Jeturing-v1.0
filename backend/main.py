@@ -1,38 +1,43 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from contextlib import asynccontextmanager
 import numpy as np
-import random
 import time
 
 from database import get_db, init_db
 from models import User, SignalLog, BluetoothScan, WifiScan
 
+# Lifespan context manager for startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    print("✓ PocketGone Backend Server Started")
+    print("✓ Database initialized")
+    yield
+    # Shutdown (if needed)
+
 # Initialize FastAPI app
 app = FastAPI(
     title="PocketGone Backend API",
     description="RF Spectrum Analysis, Bluetooth Diagnostics, and WiFi Lab Backend",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize database on startup
-@app.on_event("startup")
-async def startup_event():
-    init_db()
-    print("✓ PocketGone Backend Server Started")
-    print("✓ Database initialized")
 
 # ============================================================================
 # PYDANTIC SCHEMAS
@@ -249,7 +254,8 @@ async def scan_bluetooth(db: Session = Depends(get_db)):
     
     try:
         db.commit()
-    except:
+    except SQLAlchemyError as e:
+        print(f"Database error storing Bluetooth scans: {e}")
         db.rollback()
     
     return devices
@@ -350,7 +356,8 @@ async def scan_wifi(band: str = "2.4GHz", db: Session = Depends(get_db)):
     
     try:
         db.commit()
-    except:
+    except SQLAlchemyError as e:
+        print(f"Database error storing WiFi scans: {e}")
         db.rollback()
     
     return networks
