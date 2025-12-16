@@ -13,6 +13,8 @@ import asyncio
 from database import get_db, init_db
 from models import User, SignalLog, BluetoothScan, WifiScan, PentestSession, WifiAttackResult
 from wifi_tools import wifi_tools
+from shell_executor import shell_executor
+from evil_twin import evil_twin_manager
 
 # Lifespan context manager for startup/shutdown events
 @asynccontextmanager
@@ -151,6 +153,30 @@ class SessionStatusResponse(BaseModel):
 class ToolsAvailabilityResponse(BaseModel):
     tools: dict
     interfaces: List[WifiInterfaceResponse]
+
+class TerminalResizeRequest(BaseModel):
+    cols: int
+    rows: int
+
+class TerminalInputRequest(BaseModel):
+    data: str
+
+class CommandExecuteRequest(BaseModel):
+    command: str
+    user: str = "root"
+    timeout: int = 30
+
+class EvilTwinRequest(BaseModel):
+    interface: str
+    ssid: str
+    channel: int
+    target_mac: Optional[str] = None
+
+class CaptivePortalRequest(BaseModel):
+    interface: str
+    ssid: str
+    channel: int
+    portal_type: str = "google"  # google, facebook, generic
 
 # ============================================================================
 # AUTHENTICATION ENDPOINTS
@@ -769,6 +795,163 @@ async def websocket_pentest_output(websocket: WebSocket, session_id: str):
             await websocket.close()
         except:
             pass
+
+# ============================================================================
+# WEB TERMINAL ENDPOINTS
+# ============================================================================
+
+@app.post("/api/terminal/create")
+async def create_terminal(user: str = "root"):
+    """Create a new terminal session"""
+    try:
+        session_id = await shell_executor.create_terminal(user=user)
+        return {"success": True, "session_id": session_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/terminal/{session_id}/input")
+async def terminal_input(session_id: str, request: TerminalInputRequest):
+    """Send input to terminal session"""
+    terminal = shell_executor.get_terminal(session_id)
+    if not terminal:
+        raise HTTPException(status_code=404, detail="Terminal session not found")
+    
+    await terminal.write(request.data)
+    return {"success": True}
+
+@app.post("/api/terminal/{session_id}/resize")
+async def terminal_resize(session_id: str, request: TerminalResizeRequest):
+    """Resize terminal window"""
+    terminal = shell_executor.get_terminal(session_id)
+    if not terminal:
+        raise HTTPException(status_code=404, detail="Terminal session not found")
+    
+    terminal.resize(request.cols, request.rows)
+    return {"success": True}
+
+@app.delete("/api/terminal/{session_id}")
+async def close_terminal(session_id: str):
+    """Close terminal session"""
+    success = await shell_executor.close_terminal(session_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Terminal session not found")
+    return {"success": True}
+
+@app.websocket("/ws/terminal/{session_id}")
+async def websocket_terminal(websocket: WebSocket, session_id: str):
+    """WebSocket endpoint for terminal I/O"""
+    await websocket.accept()
+    
+    terminal = shell_executor.get_terminal(session_id)
+    if not terminal:
+        await websocket.send_json({"error": "Terminal session not found"})
+        await websocket.close()
+        return
+    
+    try:
+        while terminal.is_alive():
+            # Read from terminal
+            output = await terminal.read(timeout=0.1)
+            if output:
+                await websocket.send_json({"type": "output", "data": output})
+            
+            # Check for incoming messages (with timeout)
+            try:
+                message = await asyncio.wait_for(websocket.receive_json(), timeout=0.1)
+                if message.get("type") == "input":
+                    await terminal.write(message.get("data", ""))
+                elif message.get("type") == "resize":
+                    terminal.resize(message.get("cols", 80), message.get("rows", 24))
+            except asyncio.TimeoutError:
+                continue
+            except WebSocketDisconnect:
+                break
+        
+        await websocket.send_json({"type": "closed"})
+    except Exception as e:
+        print(f"Terminal WebSocket error: {e}")
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
+
+@app.post("/api/terminal/execute")
+async def execute_command(request: CommandExecuteRequest):
+    """Execute a single command"""
+    result = await shell_executor.execute_command(
+        request.command,
+        user=request.user,
+        timeout=request.timeout
+    )
+    return result
+
+@app.post("/api/terminal/airgeddon")
+async def launch_airgeddon(interface: str):
+    """Launch Airgeddon tool"""
+    session_id = await shell_executor.execute_airgeddon(interface)
+    if not session_id:
+        raise HTTPException(status_code=500, detail="Failed to launch Airgeddon")
+    return {"success": True, "session_id": session_id}
+
+# ============================================================================
+# EVIL TWIN / CAPTIVE PORTAL ENDPOINTS
+# ============================================================================
+
+@app.post("/api/evil-twin/create")
+async def create_evil_twin(request: EvilTwinRequest):
+    """Create an evil twin access point"""
+    success, message, ap_id = await evil_twin_manager.create_evil_twin(
+        request.interface,
+        request.ssid,
+        request.channel,
+        request.target_mac
+    )
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    
+    return {"success": True, "message": message, "ap_id": ap_id}
+
+@app.post("/api/captive-portal/create")
+async def create_captive_portal(request: CaptivePortalRequest):
+    """Create a captive portal"""
+    success, message, ap_id = await evil_twin_manager.create_captive_portal(
+        request.interface,
+        request.ssid,
+        request.channel,
+        request.portal_type
+    )
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    
+    return {"success": True, "message": message, "ap_id": ap_id}
+
+@app.delete("/api/evil-twin/{ap_id}")
+async def stop_evil_twin(ap_id: str):
+    """Stop an evil twin or captive portal"""
+    success, message = await evil_twin_manager.stop_ap(ap_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=message)
+    return {"success": True, "message": message}
+
+@app.get("/api/evil-twin/{ap_id}/info")
+async def get_evil_twin_info(ap_id: str):
+    """Get information about an evil twin AP"""
+    info = evil_twin_manager.get_ap_info(ap_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="AP not found")
+    
+    # Remove process objects from response
+    safe_info = {k: v for k, v in info.items() if not k.endswith('_process')}
+    return safe_info
+
+@app.get("/api/captive-portal/{ap_id}/credentials")
+async def get_captured_credentials(ap_id: str):
+    """Get credentials captured by captive portal"""
+    credentials = evil_twin_manager.get_captured_credentials(ap_id)
+    return {"ap_id": ap_id, "credentials": credentials, "count": len(credentials)}
 
 # ============================================================================
 # HEALTH CHECK
