@@ -8,7 +8,7 @@
 
 A comprehensive web-based platform for WiFi security testing and penetration testing education. Integrates real Kali Linux tools through a modern web interface for controlled laboratory environments.
 
-⚠️ **WARNING**: This platform contains real penetration testing capabilities. For authorized educational use only in controlled lab environments at ITLA EDU university cybersecurity classes.
+⚠️ **WARNING**: This platform contains real penetration testing capabilities. For authorized educational use only in controlled lab environments at Jeturing EDU university cybersecurity classes.
 
 ## 🎓 Educational Purpose
 
@@ -461,7 +461,7 @@ The application uses SQLite for data persistence. The database file is located a
    - Regular security audits recommended
 
 5. **Educational Use Only**:
-   - Designed for ITLA EDU cybersecurity curriculum
+   - Designed for Jeturing EDU cybersecurity curriculum
    - Supervised use by qualified instructors
    - Controlled laboratory environment
    - Student agreement forms required
@@ -627,7 +627,7 @@ Contributions are welcome! Please:
 
 ## 📄 License
 
-This project is licensed for educational use at ITLA EDU university.
+This project is licensed for educational use at Jeturing EDU university.
 
 **Terms:**
 - Educational purposes only
@@ -640,23 +640,23 @@ This project is licensed for educational use at ITLA EDU university.
 
 - **Jeturing Team** - Initial development
 - **jcarvajalantigua** - Pentesting platform transformation
-- **ITLA EDU** - Educational institution sponsor
+- **Jeturing EDU** - Educational institution sponsor
 
 ## 🔗 Links
 
 - **GitHub Repository**: https://github.com/jcarvajalantigua/PocketGone-By-Jeturing-v1.0
-- **ITLA EDU**: Instituto Tecnológico de Las Américas
+- **Jeturing EDU**: Instituto Tecnológico de Las Américas
 
 ## 📞 Support
 
 For questions or support:
 - Open an issue in the GitHub repository
-- Contact ITLA EDU cybersecurity department
+- Contact Jeturing EDU cybersecurity department
 - Review documentation at `/docs` endpoint
 
 ## ⚖️ Legal Disclaimer
 
-**IMPORTANT**: This tool is provided for educational purposes only. The authors and ITLA EDU are not responsible for any misuse or damage caused by this platform. Users must:
+**IMPORTANT**: This tool is provided for educational purposes only. The authors and Jeturing EDU are not responsible for any misuse or damage caused by this platform. Users must:
 
 1. Obtain proper authorization before testing
 2. Comply with all applicable laws and regulations
@@ -668,5 +668,5 @@ By using this platform, you agree to use it responsibly and ethically in accorda
 
 ---
 
-**Built for cybersecurity education at ITLA EDU** 🎓🔒
+**Built for cybersecurity education at Jeturing EDU** 🎓🔒
 
