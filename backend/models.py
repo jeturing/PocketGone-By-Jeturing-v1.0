@@ -3,13 +3,14 @@ from sqlalchemy.sql import func
 from database import Base
 
 class User(Base):
-    """User model for authentication"""
+    """User model for authentication with system-level access"""
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(100), unique=True, index=True, nullable=False)
     access_code = Column(String(100), nullable=False)
-    role = Column(String(20), nullable=False)  # STUDENT or PROFESSOR
+    role = Column(String(20), nullable=False)  # ADMIN (root) or STUDENT (user)
+    system_user = Column(String(100), nullable=True)  # System username for execution
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True)
@@ -55,3 +56,38 @@ class WifiScan(Base):
     band = Column(String(10), nullable=False)  # 2.4GHz, 5GHz, 6GHz
     width = Column(Integer, nullable=True)  # Channel width in MHz
     scan_timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+class PentestSession(Base):
+    """Pentesting tool execution sessions"""
+    __tablename__ = "pentest_sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(36), unique=True, nullable=False)  # UUID
+    tool_name = Column(String(100), nullable=False)  # wifite, airgeddon, reaver, etc.
+    user_id = Column(Integer, nullable=True)
+    interface = Column(String(50), nullable=True)  # Wireless interface
+    target_bssid = Column(String(17), nullable=True)
+    target_ssid = Column(String(255), nullable=True)
+    status = Column(String(20), nullable=False)  # running, stopped, completed, failed
+    pid = Column(Integer, nullable=True)  # Process ID
+    command = Column(Text, nullable=True)
+    output_log = Column(Text, nullable=True)
+    started_at = Column(DateTime(timezone=True), server_default=func.now())
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+
+class WifiAttackResult(Base):
+    """Results from WiFi penetration testing attacks"""
+    __tablename__ = "wifi_attack_results"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(36), nullable=False)
+    attack_type = Column(String(50), nullable=False)  # deauth, handshake, wps, evil_portal
+    target_bssid = Column(String(17), nullable=False)
+    target_ssid = Column(String(255), nullable=True)
+    success = Column(Boolean, default=False)
+    handshake_captured = Column(Boolean, default=False)
+    handshake_file = Column(String(500), nullable=True)
+    wps_pin = Column(String(20), nullable=True)
+    password = Column(String(255), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -8,9 +8,11 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 import numpy as np
 import time
+import asyncio
 
 from database import get_db, init_db
-from models import User, SignalLog, BluetoothScan, WifiScan
+from models import User, SignalLog, BluetoothScan, WifiScan, PentestSession, WifiAttackResult
+from wifi_tools import wifi_tools
 
 # Lifespan context manager for startup/shutdown events
 @asynccontextmanager
@@ -24,9 +26,9 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="PocketGone Backend API",
-    description="RF Spectrum Analysis, Bluetooth Diagnostics, and WiFi Lab Backend",
-    version="1.0.0",
+    title="PocketGone Pentesting Platform API",
+    description="WiFi Penetration Testing Platform with Kali Linux Tools Integration - Educational Use Only",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -103,6 +105,52 @@ class SignalLogResponse(BaseModel):
     bandwidth: float
     peak_db: float
     notes: str
+
+# New schemas for pentesting functionality
+class WifiInterfaceResponse(BaseModel):
+    name: str
+    mac: str
+    monitor_mode: bool
+    status: str
+
+class MonitorModeRequest(BaseModel):
+    interface: str
+    enable: bool
+
+class NetworkScanRequest(BaseModel):
+    interface: str
+    duration: int = 10
+
+class DeauthAttackRequest(BaseModel):
+    interface: str
+    target_bssid: str
+    client_mac: Optional[str] = None
+    count: int = 10
+
+class HandshakeCaptureRequest(BaseModel):
+    interface: str
+    target_bssid: str
+    channel: str
+    duration: int = 60
+
+class WPSAttackRequest(BaseModel):
+    interface: str
+    target_bssid: str
+    channel: str
+
+class WifiteAttackRequest(BaseModel):
+    interface: str
+    target_bssid: Optional[str] = None
+
+class SessionStatusResponse(BaseModel):
+    session_id: str
+    status: str
+    tool_name: Optional[str] = None
+    pid: Optional[int] = None
+
+class ToolsAvailabilityResponse(BaseModel):
+    tools: dict
+    interfaces: List[WifiInterfaceResponse]
 
 # ============================================================================
 # AUTHENTICATION ENDPOINTS
@@ -446,6 +494,283 @@ async def get_kpi_stats(db: Session = Depends(get_db)):
     )
 
 # ============================================================================
+# PENTESTING TOOLS ENDPOINTS  
+# ============================================================================
+
+@app.get("/api/pentest/tools", response_model=ToolsAvailabilityResponse)
+async def get_tools_availability():
+    """Get available pentesting tools and wireless interfaces"""
+    interfaces = wifi_tools.get_wireless_interfaces()
+    return ToolsAvailabilityResponse(
+        tools=wifi_tools.tools_available,
+        interfaces=[WifiInterfaceResponse(**iface) for iface in interfaces]
+    )
+
+@app.post("/api/pentest/monitor-mode")
+async def toggle_monitor_mode(request: MonitorModeRequest):
+    """Enable or disable monitor mode on wireless interface"""
+    if request.enable:
+        success, message = await wifi_tools.enable_monitor_mode(request.interface)
+    else:
+        success, message = await wifi_tools.disable_monitor_mode(request.interface)
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    
+    return {"success": True, "message": message, "interface": message if request.enable else request.interface}
+
+@app.post("/api/pentest/scan-networks")
+async def scan_wifi_networks(request: NetworkScanRequest):
+    """Scan for WiFi networks using airodump-ng"""
+    networks = await wifi_tools.scan_networks(request.interface, request.duration)
+    return {"networks": networks, "count": len(networks)}
+
+@app.post("/api/pentest/deauth-attack")
+async def deauth_attack(request: DeauthAttackRequest, db: Session = Depends(get_db)):
+    """Perform WiFi deauthentication attack"""
+    success, output = await wifi_tools.deauth_attack(
+        request.interface,
+        request.target_bssid,
+        request.client_mac,
+        request.count
+    )
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=output)
+    
+    # Log attack in database
+    try:
+        attack_result = WifiAttackResult(
+            session_id=f"deauth_{int(time.time())}",
+            attack_type="deauth",
+            target_bssid=request.target_bssid,
+            success=success,
+            notes=output
+        )
+        db.add(attack_result)
+        db.commit()
+    except SQLAlchemyError as e:
+        print(f"Error logging attack: {e}")
+        db.rollback()
+    
+    return {"success": True, "output": output}
+
+@app.post("/api/pentest/capture-handshake")
+async def capture_handshake(request: HandshakeCaptureRequest, db: Session = Depends(get_db)):
+    """Capture WPA handshake"""
+    output_file = f"/tmp/handshake_{request.target_bssid.replace(':', '')}_{int(time.time())}"
+    
+    success, message = await wifi_tools.capture_handshake(
+        request.interface,
+        request.target_bssid,
+        request.channel,
+        output_file,
+        request.duration
+    )
+    
+    # Log capture attempt
+    try:
+        attack_result = WifiAttackResult(
+            session_id=f"handshake_{int(time.time())}",
+            attack_type="handshake",
+            target_bssid=request.target_bssid,
+            success=success,
+            handshake_captured=success,
+            handshake_file=output_file if success else None,
+            notes=message
+        )
+        db.add(attack_result)
+        db.commit()
+    except SQLAlchemyError as e:
+        print(f"Error logging capture: {e}")
+        db.rollback()
+    
+    return {"success": success, "message": message, "file": output_file if success else None}
+
+@app.post("/api/pentest/wps-attack")
+async def wps_attack(request: WPSAttackRequest, db: Session = Depends(get_db)):
+    """Start WPS attack using Reaver"""
+    success, message, session_id = await wifi_tools.wps_attack_reaver(
+        request.interface,
+        request.target_bssid,
+        request.channel
+    )
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    
+    # Log session in database
+    try:
+        pentest_session = PentestSession(
+            session_id=session_id,
+            tool_name="reaver",
+            interface=request.interface,
+            target_bssid=request.target_bssid,
+            status="running",
+            command=f"reaver -i {request.interface} -b {request.target_bssid} -c {request.channel}"
+        )
+        db.add(pentest_session)
+        db.commit()
+    except SQLAlchemyError as e:
+        print(f"Error logging session: {e}")
+        db.rollback()
+    
+    return {"success": True, "message": message, "session_id": session_id}
+
+@app.post("/api/pentest/wifite-attack")
+async def wifite_attack(request: WifiteAttackRequest, db: Session = Depends(get_db)):
+    """Start automated Wifite attack"""
+    success, message, session_id = await wifi_tools.run_wifite(
+        request.interface,
+        request.target_bssid
+    )
+    
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    
+    # Log session in database
+    try:
+        pentest_session = PentestSession(
+            session_id=session_id,
+            tool_name="wifite",
+            interface=request.interface,
+            target_bssid=request.target_bssid,
+            status="running",
+            command=f"wifite -i {request.interface}"
+        )
+        db.add(pentest_session)
+        db.commit()
+    except SQLAlchemyError as e:
+        print(f"Error logging session: {e}")
+        db.rollback()
+    
+    return {"success": True, "message": message, "session_id": session_id}
+
+@app.post("/api/pentest/stop-session/{session_id}")
+async def stop_pentest_session(session_id: str, db: Session = Depends(get_db)):
+    """Stop an active pentesting session"""
+    success, message = await wifi_tools.stop_session(session_id)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail=message)
+    
+    # Update session in database
+    try:
+        session = db.query(PentestSession).filter(PentestSession.session_id == session_id).first()
+        if session:
+            session.status = "stopped"
+            session.ended_at = datetime.now()
+            db.commit()
+    except SQLAlchemyError as e:
+        print(f"Error updating session: {e}")
+        db.rollback()
+    
+    return {"success": True, "message": message}
+
+@app.get("/api/pentest/session-status/{session_id}", response_model=SessionStatusResponse)
+async def get_session_status(session_id: str, db: Session = Depends(get_db)):
+    """Get status of a pentesting session"""
+    status = wifi_tools.get_session_status(session_id)
+    
+    # Get from database
+    try:
+        session = db.query(PentestSession).filter(PentestSession.session_id == session_id).first()
+        if session:
+            return SessionStatusResponse(
+                session_id=session_id,
+                status=session.status,
+                tool_name=session.tool_name,
+                pid=session.pid
+            )
+    except SQLAlchemyError:
+        pass
+    
+    return SessionStatusResponse(
+        session_id=session_id,
+        status=status.get('status', 'unknown'),
+        pid=status.get('pid')
+    )
+
+@app.get("/api/pentest/attack-history")
+async def get_attack_history(limit: int = 50, db: Session = Depends(get_db)):
+    """Get history of WiFi attacks"""
+    try:
+        attacks = db.query(WifiAttackResult).order_by(
+            WifiAttackResult.created_at.desc()
+        ).limit(limit).all()
+        
+        return {
+            "attacks": [
+                {
+                    "id": attack.id,
+                    "session_id": attack.session_id,
+                    "attack_type": attack.attack_type,
+                    "target_bssid": attack.target_bssid,
+                    "target_ssid": attack.target_ssid,
+                    "success": attack.success,
+                    "handshake_captured": attack.handshake_captured,
+                    "handshake_file": attack.handshake_file,
+                    "wps_pin": attack.wps_pin,
+                    "password": attack.password,
+                    "notes": attack.notes,
+                    "created_at": attack.created_at.isoformat() if attack.created_at else None
+                }
+                for attack in attacks
+            ]
+        }
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.websocket("/ws/pentest/{session_id}")
+async def websocket_pentest_output(websocket: WebSocket, session_id: str):
+    """WebSocket endpoint for real-time pentesting tool output"""
+    await websocket.accept()
+    
+    try:
+        # Check if session exists
+        if session_id not in wifi_tools.active_sessions:
+            await websocket.send_json({"error": "Session not found"})
+            await websocket.close()
+            return
+        
+        process = wifi_tools.active_sessions[session_id]
+        
+        # Stream output
+        while process.returncode is None:
+            try:
+                # Read stdout
+                if process.stdout:
+                    line = await asyncio.wait_for(process.stdout.readline(), timeout=0.1)
+                    if line:
+                        await websocket.send_json({"type": "stdout", "data": line.decode()})
+                
+                # Read stderr
+                if process.stderr:
+                    line = await asyncio.wait_for(process.stderr.readline(), timeout=0.1)
+                    if line:
+                        await websocket.send_json({"type": "stderr", "data": line.decode()})
+            except asyncio.TimeoutError:
+                continue
+            except Exception as e:
+                await websocket.send_json({"type": "error", "data": str(e)})
+                break
+        
+        await websocket.send_json({"type": "completed", "returncode": process.returncode})
+    except WebSocketDisconnect:
+        print(f"WebSocket disconnected for session {session_id}")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        try:
+            await websocket.send_json({"type": "error", "data": str(e)})
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
+
+# ============================================================================
 # HEALTH CHECK
 # ============================================================================
 
@@ -454,9 +779,10 @@ async def root():
     """API health check"""
     return {
         "status": "online",
-        "service": "PocketGone Backend API",
-        "version": "1.0.0",
-        "message": "RF Spectrum Analysis, Bluetooth Diagnostics, and WiFi Lab"
+        "service": "PocketGone Pentesting Platform",
+        "version": "2.0.0",
+        "message": "WiFi Penetration Testing Platform - Educational Use Only",
+        "warning": "⚠️ For authorized educational use in controlled lab environments only"
     }
 
 @app.get("/health")

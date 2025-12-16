@@ -42,23 +42,25 @@ def init_db():
         # Check if users exist
         existing_users = db.query(User).count()
         if existing_users == 0:
-            # Create default users
+            # Create default users with system-level credentials
             admin_user = User(
-                username="Prof. Falken",
-                access_code="admin",
-                role="PROFESSOR",
+                username="root",
+                access_code="toor",  # root/toor for admin access
+                role="ADMIN",
+                system_user="root",
                 is_active=True
             )
             student_user = User(
-                username="Student Unit 1",
+                username="student",
                 access_code="student",
                 role="STUDENT",
+                system_user="student",  # System user for student execution
                 is_active=True
             )
             db.add(admin_user)
             db.add(student_user)
             db.commit()
-            print("✓ Default users created")
+            print("✓ Default users created (root/toor for admin, student/student)")
     except Exception as e:
         print(f"Error seeding database: {e}")
         db.rollback()
