@@ -1,5 +1,5 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://jeturing.com/web/image/944-60e50baf/logo%20Jeturing%20animado.gif" />
+<img width="1200" height="780" alt="GHBanner" src="https://jeturing.com/web/image/944-60e50baf/logo%20Jeturing%20animado.gif" />
 </div>
 
 # PocketGone By Jeturing v2.0
