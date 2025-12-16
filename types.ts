@@ -81,6 +81,7 @@ export enum AppTab {
   PENTEST = 'PENTEST',     // New: Pentesting Tools
   TERMINAL = 'TERMINAL',   // New: Web Terminal
   EVIL_TWIN = 'EVIL_TWIN', // New: Evil Twin/Captive Portal
+  AIRGEDDON = 'AIRGEDDON', // New: Airgeddon Suite
   LOGS = 'LOGS',
   ANALYSIS = 'ANALYSIS',
   SETTINGS = 'SETTINGS'

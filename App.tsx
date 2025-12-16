@@ -7,13 +7,14 @@ import { WifiView } from './components/WifiView';
 import { PentestView } from './components/PentestView';
 import { EvilTwinView } from './components/EvilTwinView';
 import { TerminalView } from './components/TerminalView';
+import { AirgeddonView } from './components/AirgeddonView';
 import { Login } from './components/Login';
 import { KpiDashboard } from './components/KpiDashboard';
 import { RadioConfig, SpectrumPoint, SignalLog, AppTab, ModoSState, UserSession } from './types';
 import { generateSpectrumData } from './services/rfService';
 import { login, logout, getSession } from './services/authService';
 import { v4 as uuidv4 } from 'uuid';
-import { LayoutDashboard, Radio, FileBarChart, Settings, Wifi, Search, Bluetooth, AlertTriangle, LogOut, Activity, Shield, Terminal, Globe } from 'lucide-react';
+import { LayoutDashboard, Radio, FileBarChart, Settings, Wifi, Search, Bluetooth, AlertTriangle, LogOut, Activity, Shield, Terminal, Globe, Crosshair } from 'lucide-react';
 
 const INITIAL_CONFIG: RadioConfig = {
   centerFreq: 98.5, 
@@ -150,6 +151,10 @@ const App: React.FC = () => {
             <Terminal size={20} /> Terminal
           </button>
 
+          <button onClick={() => setActiveTab(AppTab.AIRGEDDON)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === AppTab.AIRGEDDON ? 'bg-purple-600/20 text-purple-400 font-bold border border-purple-600/50' : 'text-slate-400 hover:bg-slate-800'}`}>
+            <Crosshair size={20} /> Airgeddon
+          </button>
+
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold text-slate-600 uppercase tracking-wider">Tools</div>
 
           <button onClick={() => setActiveTab(AppTab.LOGS)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === AppTab.LOGS ? 'bg-rf-accent text-slate-900 font-bold' : 'text-slate-400 hover:bg-slate-800'}`}>
@@ -213,6 +218,8 @@ const App: React.FC = () => {
             {activeTab === AppTab.EVIL_TWIN && <EvilTwinView />}
 
             {activeTab === AppTab.TERMINAL && <TerminalView />}
+
+            {activeTab === AppTab.AIRGEDDON && <AirgeddonView />}
 
             {activeTab === AppTab.LOGS && <LogsView logs={logs} onDelete={(id) => setLogs(p => p.filter(l => l.id !== id))} onUpdateLog={(id, u) => setLogs(p => p.map(l => l.id === id ? {...l, ...u} : l))} />}
             
