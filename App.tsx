@@ -4,13 +4,16 @@ import { ControlPanel } from './components/ControlPanel';
 import { LogsView } from './components/LogsView';
 import { BluetoothView } from './components/BluetoothView';
 import { WifiView } from './components/WifiView';
+import { PentestView } from './components/PentestView';
+import { EvilTwinView } from './components/EvilTwinView';
+import { TerminalView } from './components/TerminalView';
 import { Login } from './components/Login';
 import { KpiDashboard } from './components/KpiDashboard';
 import { RadioConfig, SpectrumPoint, SignalLog, AppTab, ModoSState, UserSession } from './types';
 import { generateSpectrumData } from './services/rfService';
 import { login, logout, getSession } from './services/authService';
 import { v4 as uuidv4 } from 'uuid';
-import { LayoutDashboard, Radio, FileBarChart, Settings, Wifi, Search, Bluetooth, AlertTriangle, LogOut, Activity } from 'lucide-react';
+import { LayoutDashboard, Radio, FileBarChart, Settings, Wifi, Search, Bluetooth, AlertTriangle, LogOut, Activity, Shield, Terminal, Globe } from 'lucide-react';
 
 const INITIAL_CONFIG: RadioConfig = {
   centerFreq: 98.5, 
@@ -133,6 +136,20 @@ const App: React.FC = () => {
             <Wifi size={20} /> WiFi Monitor
           </button>
 
+          <div className="pt-4 pb-2 px-4 text-[10px] font-bold text-slate-600 uppercase tracking-wider">Pentesting</div>
+
+          <button onClick={() => setActiveTab(AppTab.PENTEST)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === AppTab.PENTEST ? 'bg-red-600/20 text-red-400 font-bold border border-red-600/50' : 'text-slate-400 hover:bg-slate-800'}`}>
+            <Shield size={20} /> WiFi Attacks
+          </button>
+
+          <button onClick={() => setActiveTab(AppTab.EVIL_TWIN)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === AppTab.EVIL_TWIN ? 'bg-orange-600/20 text-orange-400 font-bold border border-orange-600/50' : 'text-slate-400 hover:bg-slate-800'}`}>
+            <Globe size={20} /> Evil Twin
+          </button>
+
+          <button onClick={() => setActiveTab(AppTab.TERMINAL)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === AppTab.TERMINAL ? 'bg-green-600/20 text-green-400 font-bold border border-green-600/50' : 'text-slate-400 hover:bg-slate-800'}`}>
+            <Terminal size={20} /> Terminal
+          </button>
+
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold text-slate-600 uppercase tracking-wider">Tools</div>
 
           <button onClick={() => setActiveTab(AppTab.LOGS)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === AppTab.LOGS ? 'bg-rf-accent text-slate-900 font-bold' : 'text-slate-400 hover:bg-slate-800'}`}>
@@ -190,6 +207,12 @@ const App: React.FC = () => {
             {activeTab === AppTab.BLUETOOTH && <BluetoothView onModoSToggle={toggleModoS} modoSState={modoSState} />}
 
             {activeTab === AppTab.WIFI && <WifiView />}
+
+            {activeTab === AppTab.PENTEST && <PentestView />}
+
+            {activeTab === AppTab.EVIL_TWIN && <EvilTwinView />}
+
+            {activeTab === AppTab.TERMINAL && <TerminalView />}
 
             {activeTab === AppTab.LOGS && <LogsView logs={logs} onDelete={(id) => setLogs(p => p.filter(l => l.id !== id))} onUpdateLog={(id, u) => setLogs(p => p.map(l => l.id === id ? {...l, ...u} : l))} />}
             
