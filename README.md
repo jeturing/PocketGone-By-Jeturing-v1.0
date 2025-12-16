@@ -97,7 +97,52 @@ sudo apt update
 sudo apt install -y aircrack-ng wifite reaver hostapd dnsmasq python3-pip nodejs npm
 ```
 
-## 🚀 Installation & Setup
+## 🚀 Quick Installation (Automated)
+
+### One-Command Installation
+
+For a fresh Linux system, use the automated installer that handles everything:
+
+```bash
+# Clone repository
+git clone https://github.com/jcarvajalantigua/PocketGone-By-Jeturing-v1.0.git
+cd PocketGone-By-Jeturing-v1.0
+
+# Run automated installer
+sudo bash install.sh
+```
+
+The installer will:
+- ✅ Update system packages
+- ✅ Install Python 3.9+ and Node.js 18+
+- ✅ Install all pentesting tools (aircrack-ng, wifite, reaver, etc.)
+- ✅ Set up backend and frontend
+- ✅ Initialize database
+- ✅ Create systemd services
+- ✅ Configure firewall
+- ✅ Create quick start scripts
+
+**Installation time**: 10-30 minutes depending on internet speed
+
+### Verify Installation
+
+```bash
+./verify-installation.sh
+```
+
+### Start the Platform
+
+```bash
+# Quick start
+./start-pocketgone.sh
+
+# Or using systemd
+./pocketgone-service.sh start
+```
+
+📖 **For detailed installation instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)**
+
+## 🚀 Manual Installation & Setup
 
 ### 1. Clone the Repository
 
