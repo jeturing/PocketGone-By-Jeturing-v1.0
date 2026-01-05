@@ -281,7 +281,11 @@ echo -e "${BLUE}╚════════════════════�
 echo ""
 
 TOTAL=$((PASSED + FAILED))
-PASS_RATE=$((PASSED * 100 / TOTAL))
+if [ $TOTAL -eq 0 ]; then
+    PASS_RATE=0
+else
+    PASS_RATE=$((PASSED * 100 / TOTAL))
+fi
 
 echo -e "Total Tests: $TOTAL"
 echo -e "${GREEN}Passed: $PASSED${NC}"
