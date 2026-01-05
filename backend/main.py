@@ -9,12 +9,14 @@ from contextlib import asynccontextmanager
 import numpy as np
 import time
 import asyncio
+import os
 
 from database import get_db, init_db
 from models import User, SignalLog, BluetoothScan, WifiScan, PentestSession, WifiAttackResult
 from wifi_tools import wifi_tools
 from shell_executor import shell_executor
 from evil_twin import evil_twin_manager
+from auto_installer import get_tool_installer
 
 # Lifespan context manager for startup/shutdown events
 @asynccontextmanager
@@ -955,6 +957,92 @@ async def get_captured_credentials(ap_id: str):
 
 # ============================================================================
 # HEALTH CHECK
+# ============================================================================
+
+# ============================================================================
+# TOOL MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.get("/api/tools/status")
+async def get_tools_status():
+    """Get installation status of all penetration testing tools"""
+    try:
+        installer = get_tool_installer()
+        status = installer.get_installation_status()
+        missing_tools = installer.get_missing_tools()
+        
+        return {
+            "os_type": installer.os_type.value,
+            "tools": status,
+            "missing_required_tools": missing_tools,
+            "all_required_installed": len(missing_tools) == 0
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/tools/install")
+async def install_missing_tools(required_only: bool = True):
+    """Install all missing penetration testing tools"""
+    try:
+        installer = get_tool_installer()
+        
+        # Check if running as root
+        if os.geteuid() != 0:
+            raise HTTPException(
+                status_code=403,
+                detail="Installation requires root privileges. Please run the backend server with sudo."
+            )
+        
+        result = installer.install_all_missing(required_only=required_only)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/tools/install/{tool_name}")
+async def install_specific_tool(tool_name: str):
+    """Install a specific tool"""
+    try:
+        installer = get_tool_installer()
+        
+        # Check if running as root
+        if os.geteuid() != 0:
+            raise HTTPException(
+                status_code=403,
+                detail="Installation requires root privileges. Please run the backend server with sudo."
+            )
+        
+        success, message = installer.install_tool(tool_name)
+        
+        if success:
+            return {
+                "success": True,
+                "tool": tool_name,
+                "message": message
+            }
+        else:
+            raise HTTPException(status_code=500, detail=message)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/tools/missing")
+async def get_missing_tools():
+    """Get list of missing required tools"""
+    try:
+        installer = get_tool_installer()
+        missing = installer.get_missing_tools()
+        return {
+            "missing_tools": missing,
+            "count": len(missing)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# ROOT/HEALTH ENDPOINTS
 # ============================================================================
 
 @app.get("/")

@@ -172,6 +172,26 @@ if [ -n "$BACKEND_PID" ] && ps -p $BACKEND_PID > /dev/null 2>&1; then
         test_failed "Pentest tools endpoint failed"
     fi
     
+    # Test tool management status endpoint
+    RESPONSE=$(curl -s -w "\n%{http_code}" http://localhost:8000/api/tools/status)
+    HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+    BODY=$(echo "$RESPONSE" | head -n -1)
+    if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "os_type"; then
+        test_passed "Tool management status endpoint responds"
+    else
+        test_failed "Tool management status endpoint failed"
+    fi
+    
+    # Test missing tools endpoint
+    RESPONSE=$(curl -s -w "\n%{http_code}" http://localhost:8000/api/tools/missing)
+    HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+    BODY=$(echo "$RESPONSE" | head -n -1)
+    if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "missing_tools"; then
+        test_passed "Missing tools detection endpoint responds"
+    else
+        test_failed "Missing tools detection endpoint failed"
+    fi
+    
     # Test API documentation
     RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/docs)
     if [ "$RESPONSE" = "200" ]; then
