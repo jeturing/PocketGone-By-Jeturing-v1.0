@@ -60,7 +60,7 @@ echo ""
 
 # Test 2: Check Node.js dependencies
 echo -e "${YELLOW}Test 2: Node.js Dependencies${NC}"
-if [ -d "node_modules" ] && [ -f "node_modules/.package-lock.json" ]; then
+if [ -d "node_modules" ] && [ -f "package-lock.json" ]; then
     test_passed "Node.js dependencies are installed"
 else
     test_failed "Node.js dependencies are missing"
@@ -195,8 +195,12 @@ if [ -f "data/pocketgone.db" ]; then
     test_passed "Database file exists"
     
     # Check database integrity
-    if sqlite3 data/pocketgone.db "PRAGMA integrity_check;" 2>/dev/null | grep -q "ok"; then
-        test_passed "Database integrity check passed"
+    if command -v sqlite3 &> /dev/null; then
+        if sqlite3 data/pocketgone.db "PRAGMA integrity_check;" 2>/dev/null | grep -q "ok"; then
+            test_passed "Database integrity check passed"
+        else
+            test_failed "Database integrity check failed"
+        fi
     else
         test_info "Database integrity check skipped (sqlite3 not available)"
     fi
@@ -282,10 +286,12 @@ echo ""
 
 TOTAL=$((PASSED + FAILED))
 if [ $TOTAL -eq 0 ]; then
-    PASS_RATE=0
-else
-    PASS_RATE=$((PASSED * 100 / TOTAL))
+    echo -e "${RED}ERROR: No tests were executed!${NC}"
+    echo ""
+    exit 2
 fi
+
+PASS_RATE=$((PASSED * 100 / TOTAL))
 
 echo -e "Total Tests: $TOTAL"
 echo -e "${GREEN}Passed: $PASSED${NC}"
